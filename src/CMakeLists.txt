@@ -46,6 +46,11 @@ add_library(llama
             ${LLAMA_MODELS_SOURCES}
             )
 
+# Hedy custom bindings injection (mirrors whisper.cpp pattern)
+if (DEFINED HEDY_LLAMA_BINDINGS_SRC)
+    target_sources(llama PRIVATE ${HEDY_LLAMA_BINDINGS_SRC})
+endif()
+
 set_target_properties(llama PROPERTIES
     VERSION ${LLAMA_VERSION_BASE}
     SOVERSION ${LLAMA_VERSION_MAJOR}
