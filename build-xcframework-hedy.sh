@@ -59,6 +59,14 @@ setup_framework_structure() {
 
     local framework_dir="${build_dir}/framework/llama.framework"
 
+    # Map platform to Apple SDK platform name for Info.plist
+    local platform_name
+    case "$platform" in
+        macos) platform_name="MacOSX" ;;
+        ios)   platform_name="iPhoneOS" ;;
+        *)     platform_name="MacOSX" ;;
+    esac
+
     if [[ "$platform" == "macos" ]]; then
         mkdir -p "${framework_dir}/Versions/A/Headers"
         mkdir -p "${framework_dir}/Versions/A/Resources"
@@ -114,18 +122,32 @@ framework module llama {
 }
 MODULEMAP
 
-    # Info.plist
+    # Info.plist (must match whisper.framework format for Xcode code-sign-on-copy)
     cat > "${plist_path}" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>llama</string>
     <key>CFBundleIdentifier</key>
     <string>ai.hedy.llama</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
     <key>CFBundleName</key>
     <string>llama</string>
-    <key>CFBundleVersion</key>
+    <key>CFBundlePackageType</key>
+    <string>FMWK</string>
+    <key>CFBundleShortVersionString</key>
     <string>1.0</string>
+    <key>CFBundleSupportedPlatforms</key>
+    <array>
+        <string>${platform_name}</string>
+    </array>
+    <key>CFBundleVersion</key>
+    <string>1</string>
     <key>MinimumOSVersion</key>
     <string>${min_version}</string>
 </dict>
