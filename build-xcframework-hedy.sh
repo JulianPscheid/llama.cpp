@@ -11,6 +11,11 @@ LLAMA_BUILD_COMMON=OFF
 LLAMA_BUILD_EXAMPLES=OFF
 LLAMA_BUILD_TESTS=OFF
 LLAMA_BUILD_SERVER=OFF
+# AIDEV-NOTE: app/ is the upstream unified binary (b9360+). Unlike tools/examples
+# it is NOT gated behind LLAMA_BUILD_COMMON, so it builds even with COMMON=OFF and
+# pulls in app/llama.cpp which needs a generated build-info.h we don't produce in
+# the framework-only build. We only ship the llama library, so disable it.
+LLAMA_BUILD_APP=OFF
 GGML_METAL=ON
 GGML_METAL_EMBED_LIBRARY=ON
 GGML_BLAS_DEFAULT=ON
@@ -38,6 +43,7 @@ COMMON_CMAKE_ARGS=(
     -DLLAMA_BUILD_EXAMPLES=${LLAMA_BUILD_EXAMPLES}
     -DLLAMA_BUILD_TESTS=${LLAMA_BUILD_TESTS}
     -DLLAMA_BUILD_SERVER=${LLAMA_BUILD_SERVER}
+    -DLLAMA_BUILD_APP=${LLAMA_BUILD_APP}
     -DGGML_METAL=${GGML_METAL}
     -DGGML_METAL_EMBED_LIBRARY=${GGML_METAL_EMBED_LIBRARY}
     -DGGML_BLAS_DEFAULT=${GGML_BLAS_DEFAULT}
