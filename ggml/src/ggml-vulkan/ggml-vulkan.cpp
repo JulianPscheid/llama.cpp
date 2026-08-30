@@ -1,5 +1,31 @@
 #include "ggml-vulkan.h"
 #include <vulkan/vulkan_core.h>
+
+// HEDY PATCH (temporary, diagnostic): Android pipeline-compile tracing.
+// Upstream reports compute-pipeline failures via std::cerr, which Android
+// discards, so a driver that hangs or fails inside createComputePipeline is
+// invisible in logcat. Hedy's native log filter also collapses "ggml_vulkan:"
+// lines. Log the pipeline name around the create call so a wedged shader
+// compile names itself. Pipeline compiles run CONCURRENTLY (threads claim
+// tasks in ggml_vk_load_shaders and others block on compile_cv), so every line
+// carries tid: an unmatched "begin" is a call still inside the driver. If a
+// driver serializes creation internally, several threads block at once and the
+// unmatched begins are a suspect SET, earliest first -- not proof that each one
+// wedged independently. Every begin matched by an end means pipeline creation
+// is not the hang; look at graph submission or a fence wait instead.
+// Start `adb logcat -s HedyVkPipeline` BEFORE reproducing: the filter selects
+// what is shown, not what is stored, so a long hang on a chatty device can
+// evict the crucial line before collection.
+// REMOVE once the Imagination/PowerVR hang is diagnosed.
+#if defined(__ANDROID__)
+#include <android/log.h>
+#include <unistd.h>
+#include <chrono>
+#define HEDY_VK_PIPELINE_LOG(...) \
+    ((void) __android_log_print(ANDROID_LOG_INFO, "HedyVkPipeline", __VA_ARGS__))
+#else
+#define HEDY_VK_PIPELINE_LOG(...) ((void) 0)
+#endif
 #if defined(GGML_VULKAN_RUN_TESTS) || defined(GGML_VULKAN_CHECK_RESULTS)
 #include <chrono>
 #include "ggml-cpu.h"
@@ -3104,13 +3130,27 @@ static void ggml_vk_create_pipeline_func(vk_device& device, vk_pipeline& pipelin
     }
 #endif
 
+    // HEDY PATCH (temporary, diagnostic): see HEDY_VK_PIPELINE_LOG above.
+    HEDY_VK_PIPELINE_LOG("compile begin tid=%d name=%s",
+                         (int) gettid(), pipeline->name.c_str());
+#if defined(__ANDROID__)
+    const auto hedy_pipeline_compile_start = std::chrono::steady_clock::now();
+#endif
     try {
         pipeline->pipeline = device->device.createComputePipeline(VK_NULL_HANDLE, compute_pipeline_create_info).value;
     } catch (const vk::SystemError& e) {
+        HEDY_VK_PIPELINE_LOG("compile FAILED tid=%d name=%s what=%s",
+                             (int) gettid(), pipeline->name.c_str(), e.what());
         std::cerr << "ggml_vulkan: Compute pipeline creation failed for " << pipeline->name << std::endl;
         std::cerr << "ggml_vulkan: " << e.what() << std::endl;
         throw e;
     }
+#if defined(__ANDROID__)
+    HEDY_VK_PIPELINE_LOG("compile end tid=%d name=%s elapsed_ms=%lld",
+                         (int) gettid(), pipeline->name.c_str(),
+                         (long long) std::chrono::duration_cast<std::chrono::milliseconds>(
+                             std::chrono::steady_clock::now() - hedy_pipeline_compile_start).count());
+#endif
 
     if (vk_instance.debug_utils_support) {
         vk::DebugUtilsObjectNameInfoEXT duoni;
