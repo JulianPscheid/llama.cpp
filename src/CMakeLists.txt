@@ -10,6 +10,7 @@ file(GLOB LLAMA_MODELS_SOURCES "models/*.cpp")
 
 set(LLAMA_CORE_SOURCES
     llama.cpp
+    hedy-kv-estimate.cpp
     llama-adapter.cpp
     llama-arch.cpp
     llama-batch.cpp
