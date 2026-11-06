@@ -17,7 +17,7 @@ LLAMA_BUILD_SERVER=OFF
 # the framework-only build. We only ship the llama library, so disable it.
 LLAMA_BUILD_APP=OFF
 GGML_METAL=ON
-GGML_METAL_EMBED_LIBRARY=ON
+GGML_METAL_EMBED_LIBRARY=OFF
 GGML_BLAS_DEFAULT=ON
 GGML_METAL_USE_BF16=ON
 GGML_OPENMP=OFF
@@ -159,6 +159,22 @@ MODULEMAP
 </dict>
 </plist>
 PLIST
+
+    if [ "${GGML_METAL_EMBED_LIBRARY}" = "OFF" ]; then
+        local resource_path="${framework_dir}"
+        if [ "$platform" = "macos" ]; then
+            resource_path="${framework_dir}/Versions/A/Resources"
+        fi
+        local metallib="${build_dir}/bin/default.metallib"
+        if [ ! -f "$metallib" ]; then
+            echo "ERROR: Missing compiled Metal library: $metallib"
+            return 1
+        fi
+        cp "$metallib" "${resource_path}/default.metallib"
+        if [ -f "${build_dir}/bin/ggml-tensor.metallib" ]; then
+            cp "${build_dir}/bin/ggml-tensor.metallib" "${resource_path}/ggml-tensor.metallib"
+        fi
+    fi
 }
 
 combine_static_libraries() {
@@ -232,6 +248,7 @@ cmake -B build-ios-sim -G Xcode \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=${IOS_MIN_OS_VERSION} \
     -DCMAKE_SYSTEM_NAME=iOS \
     -DCMAKE_OSX_SYSROOT=iphonesimulator \
+    -DGGML_METAL_TARGET_OS=ios \
     -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
     -DCMAKE_C_FLAGS="${COMMON_C_FLAGS}" \
     -DCMAKE_CXX_FLAGS="${COMMON_CXX_FLAGS}" \
@@ -244,6 +261,7 @@ cmake -B build-ios-device -G Xcode \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=${IOS_MIN_OS_VERSION} \
     -DCMAKE_SYSTEM_NAME=iOS \
     -DCMAKE_OSX_SYSROOT=iphoneos \
+    -DGGML_METAL_TARGET_OS=ios \
     -DCMAKE_OSX_ARCHITECTURES="arm64" \
     -DCMAKE_C_FLAGS="${COMMON_C_FLAGS}" \
     -DCMAKE_CXX_FLAGS="${COMMON_CXX_FLAGS}" \
@@ -253,6 +271,8 @@ cmake --build build-ios-device --config Release -- -quiet
 echo "Building llama.cpp for macOS..."
 cmake -B build-macos -G Xcode \
     "${COMMON_CMAKE_ARGS[@]}" \
+    -DGGML_METAL_TARGET_OS=macos \
+    -DGGML_METAL_MACOSX_VERSION_MIN=${MACOS_MIN_OS_VERSION} \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOS_MIN_OS_VERSION} \
     -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
     -DCMAKE_C_FLAGS="${COMMON_C_FLAGS}" \
